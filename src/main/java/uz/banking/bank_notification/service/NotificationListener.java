@@ -1,6 +1,8 @@
 package uz.banking.bank_notification.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import uz.banking.bank_notification.client.BankCoreClient;
@@ -10,16 +12,19 @@ import uz.banking.bank_notification.dto.UserDto;
 
 import java.time.format.DateTimeFormatter;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class NotificationListener {
 
     private final BankCoreClient bankCoreClient;
     private final EmailSenderService emailSenderService;
+    private final ObjectMapper objectMapper;
 
     @RabbitListener(queues = "notification.queue")
-    public void receiveListener(TransferNotificationDto notification) {
+    public void receiveListener(String jsonMessage) {
         try {
+            TransferNotificationDto notification = objectMapper.readValue(jsonMessage, TransferNotificationDto.class);
             Long receiverId = notification.getToAccountId();
 
             ApiResponseDto response = bankCoreClient.getUserInfo(receiverId);
@@ -44,7 +49,7 @@ public class NotificationListener {
 
             emailSenderService.sendEmail(receiver.getEmail(), subject, body);
         } catch (Exception e) {
-            System.err.println("Error processing notification: " + e.getMessage());
+            log.error("Error processing notification: {}", e.getMessage());
         }
     }
 }
